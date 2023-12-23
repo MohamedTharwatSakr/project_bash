@@ -1,0 +1,727 @@
+#! /usr/bin/bash
+export LC_COLLATE=C
+shopt -s extglob 
+
+PS3="connectedd to $1 DB
+please choose operation >>"
+
+select table_option in "Create table" "List tables" "Drop table" "Insert into table" "Select from table" "Delete from table" "Update table" "Return" "Exit"
+do
+	case $REPLY in
+		#Create table
+		#read Table name 
+		1) 
+			clear
+			pk=0
+			read -p "Please enter Table name: " Table_name
+			while true
+			do
+				#validate name
+				case $Table_name in 
+					@([A-Za-z])*([A-Za-z0-9" ""_"]) ) 
+						#check if Table already exists			
+						if [ -e $Table_name ];then
+							clear
+							echo "This Table already exists"
+							read -p "Please enter Table name: " Table_name
+						else
+							#read column name,constrain and data type
+							while true
+							do
+								read -p "Please enter column number: " Column_number
+								case $Column_number in
+									@([1-9])*([1-9]) )
+										break
+									;;
+									*)
+										clear
+										echo "please enter a number"	
+								esac
+							done
+							for ((i=1; i <= $Column_number; i++))
+							do
+								clear
+								read -p "Please enter column no.$i name: " Column_name
+								
+								while true
+								do
+									#validate name
+									case $Column_name in 
+										@([A-Za-z])*([A-Za-z0-9" ""_"]) ) 
+											for name in ${column_arr[@]}
+											do
+												#check if column name already exist
+												while true
+												do
+													if [[ $Column_name == $name ]];then
+														clear
+														echo "this column already exists"
+														read -p "Please enter column no.$i name: " Column_name
+														while true
+														do
+															case $Column_name in 
+																@([A-Za-z])*([A-Za-z0-9" ""_"]) ) 
+																	break
+																;;
+																*)
+																	clear
+																	echo "Column name can only start with a char & can only contain chars, under_score or number "
+																	read -p "Please enter column no.$i name: " Column_name
+															esac
+														done
+													else
+														break
+													fi
+												done			
+												
+											done											
+											clear		
+											PS3="Please choose column no.$i constraint: "
+											#make sure only one PK
+											if (( $pk == 0 ));then
+												select column_constrain in "Primary-Key" "Unique" "None"
+												do
+													case $REPLY in
+														1)
+															const="PK"
+															pk=1
+															break
+														;;
+														2)
+															const="UN"
+															break
+														;;
+														3)
+															const="NO"
+															break
+														;;
+														*)
+															clear
+															echo "please choose between displayed constrains"  
+													esac
+													REPLY=	
+												done
+											else
+												select column_constrain in "Unique" "None"
+												do
+													case $REPLY in
+														1)
+															const="UN"
+															break
+														;;
+														2)
+															const="NO"
+															break
+														;;
+														*)
+															clear
+															echo "please choose between displayed constrains"  
+													esac
+													REPLY=	
+												done
+											fi
+											clear	
+											PS3="Please choose column no.$i data type: "
+											select column_constrain in "String" "Integer"
+											do
+												case $REPLY in
+													1)
+														type="str"
+														break
+													;;
+													2)
+														type="int"
+														break
+													;;
+													*)
+														clear
+														echo "please choose between displayed data types"  
+												esac
+												REPLY=	
+											done	
+											#create file for data and another hidden for meta_data
+											touch .$Table_name
+											touch $Table_name
+											column_arr+=($Column_name)
+											echo "$Column_name $const $type" >> .$Table_name
+											break
+										;;
+										*)
+											clear
+											echo "Column name can only start with a char & can only contain chars, under_score or number "
+											read -p "Please enter column no.$i name: " Column_name
+									esac
+								done
+							done
+							clear	
+							echo "$Table_name table created"
+							break
+						fi
+						# col_arr=(${column_arr[@]})
+						column_arr=()
+					;;
+					*)
+						clear
+						echo "Table name can only start with a char & can only contain chars, under_score or number "
+						read -p "Please enter Table name: " Table_name
+				esac	
+			done
+			PS3="connected to $1 DB
+please choose operation >>"
+		;;
+		#LISt tables
+		2)
+			clear
+			#check whether Tables exist
+			available_Tables=( `ls $PWD` )
+			len=${#available_Tables[@]}
+			if (( $len != 0 ));then
+				echo "available tables"
+				ls 
+				echo ""
+			else
+				echo "no available tables"		
+			fi
+		;;
+		#Drop table
+		3) 
+			clear
+			#check whether tables exist
+			PS3="Please choose delete mode: "
+			available_Tables=( `ls $PWD` )
+			len=${#available_Tables[@]}
+			if (( $len != 0 ));then
+				select op in "Drop all" "Drop one" "Return"
+				do
+					#make sure to choose of the available options
+					case $REPLY in 
+						1)
+							clear
+							for Table in ${available_Tables[@]}
+							do
+								rm -r $Table
+								find . -type f -name ".*" -delete
+							done
+							echo "all tables removed"
+							break
+						;;
+						2)
+							clear
+							PS3="please choose table to drop : "
+							select Current_Table in ${available_Tables[@]} "Return"
+							do
+								#make sure to choose of the available Tables
+								case $REPLY in
+									[1-$len] )
+										rm -r $Current_Table
+										find . -type f -name ".*" -delete
+										clear
+										echo "$Current_Table table removed"
+										break
+									;;
+									$(($len+1)) )
+										clear; break
+									;;
+									*)
+										clear
+										echo "please choose between displayed tables" 
+								esac
+								REPLY=				
+							done	
+							break
+						;;
+						3)
+							clear; break
+						;;
+						*)
+							clear
+							echo "Please choose from available modes"
+					esac
+					REPLY=
+				done	
+			else
+				clear
+				echo "No available tables"
+			fi
+			PS3="connected to $1 DB   
+please choose operation >>"
+		;;
+		#insert into table
+		4)
+			clear
+			counter=1
+			PS3="please choose Table to insert into: "
+			available_Tables=( `ls $PWD` )
+			len=${#available_Tables[@]}
+			if (( $len == 0 ));then
+				echo "No available tables"
+			else
+				select Current_Table in ${available_Tables[@]} "Return"
+				do		
+					#make sure to choose of the available Tables
+					clear
+					case $REPLY in
+						[1-$len] )
+							col=(`cut -d ' ' -f 1 .$Current_Table`)
+							for col_val in ${col[@]}
+							do
+								read -p "please enter $col_val: " entry 
+								type=`awk -F' ' '{
+									if($1==c){
+										print $3
+										}										
+									}' c=$col_val .$Current_Table`
+								const=`awk -F' ' '{
+									if($1==c){
+										print $2
+										}										
+									}' c=$col_val .$Current_Table`
+								while true
+								do
+									#constrain check
+									if [[ $const != "NO" ]];then
+										var=`awk -F' ' '{
+											if($c==e){
+												print e
+												}										
+											}' e=$entry c=$counter $Current_Table`	
+										if [[ $var == "" ]];then
+											if [[ $type == "int" ]];then	
+												if [[ $entry =~ [[:digit:]]+ ]];then										 
+													break
+												else
+													clear
+													echo "please enter a number"
+													read -p "please enter $col_val: " entry
+												fi
+											else
+												if [[ $entry =~ [[:alpha:]]+ ]];then										
+													break
+												else
+													clear
+													echo "please enter a string"
+													read -p "please enter $col_val: " entry
+												fi
+											fi
+										else
+											clear
+											echo "this entry already exist"
+											read -p "please enter $col_val: " entry
+										fi
+									else
+										if [[ $type == "int" ]];then	
+												if [[ $entry =~ [[:digit:]]+ ]];then										
+													break
+												else
+													clear
+													echo "please enter a number"
+													read -p "please enter $col_val: " entry
+												fi
+											else
+												if [[ $entry =~ [[:alpha:]]+ ]];then										
+													break
+												else
+													clear
+													echo "please enter a string"
+													read -p "please enter $col_val: " entry
+												fi
+											fi
+									fi
+								done
+								entries_arr+=$entry' '  
+								counter=$(($counter+1))	
+							done
+							echo ${entries_arr[@]} >> $Current_Table
+							entries_arr=()
+							clear
+							echo "Entry recorded"
+							break
+						;;
+							$(($len+1)) )
+								clear; break
+						;;
+						*)
+							clear
+							echo "please choose between displayed tables" 
+					esac
+					REPLY=
+				done
+			fi
+			PS3="connected to $1 DB   
+please choose operation >>"
+		;;
+		#select from table
+		5)
+		# in the select all try to show column names
+			clear
+			PS3="please choose Table to select from: "
+			available_Tables=( `ls $PWD` )
+			len=${#available_Tables[@]}
+			if (( $len == 0 ));then
+				clear
+				echo "No available tables"
+			else
+				select Current_Table in ${available_Tables[@]} "Return"
+				do
+					#make sure to choose of the available Tables
+					case $REPLY in
+						[1-$len] )
+							if [[ `cat $Current_Table` == "" ]];then
+								clear
+								echo "Table is empty" 
+								break
+							else
+								clear
+								PS3="please choose select mode: "
+								select mode in "Select all" "Select by column" "Select by record" "Return"
+								do
+									case $REPLY in	
+										1)
+											clear
+											echo "Table content"
+											cat $Current_Table
+											echo 
+											break
+										;;								
+										2)	
+											col=(`cut -d ' ' -f 1 .$Current_Table`)
+											col_len=${#col[@]}
+											clear
+											PS3="please choose column: "
+											select col in ${col[@]} "Return"
+											do	
+												case $REPLY in
+													[1-$col_len] )
+														clear
+														echo "col $col"
+														awk -F' ' -v var=$REPLY '{
+															print $var
+															}
+															' $Current_Table
+														echo 
+														break
+													;;
+													$(($col_len+1)) )
+														clear; break
+													;;
+													*)
+														clear
+														echo "please choose between displayed columns"
+												esac
+												REPLY=	
+											done
+											break
+										;;
+										3)
+											col=(`cut -d ' ' -f 1 .$Current_Table`)
+											col_len=${#col[@]}
+											clear
+											PS3="please choose column: "
+											select col in ${col[@]} "Return"
+											do	
+												case $REPLY in
+													[1-$col_len] )
+														clear
+														read -p "Please enter value of $col: " value
+														var=`awk -F' ' 'BEGIN{x=0}{
+															if($c==v){
+																print $0
+																x=1
+																}
+															}
+															END{if(x==0)print "No match"}' l=$col_len c=$REPLY v=$value $Current_Table`
+														if [[ $var == 'No match' ]];then
+															clear
+															echo "No match"
+														else
+															clear
+															echo "Retrieved record"
+															echo "$var" 
+														fi
+														break
+													;;
+													$(($col_len+1)) )
+														clear; break
+													;;
+													*)
+														clear
+														echo "please choose between displayed columns"
+												esac
+												REPLY=	
+											done
+											break
+										;;
+										4)
+											clear; break
+										;;
+										*)
+											clear
+											echo "please choose 1-3" 
+									esac
+									REPLY=
+								done
+								break
+							fi
+						;;
+						$(($len+1)) )
+							clear; break
+						;;
+						*)
+							clear
+							echo "please choose between displayed tables" 
+					esac
+					REPLY=
+				done
+			fi
+			PS3="connected to $1 DB   
+please choose operation >>"
+		;;
+		#delete from table
+		6)
+			clear
+			PS3="please choose Table to delete from: "
+			available_Tables=( `ls $PWD` )
+			len=${#available_Tables[@]}
+			if (( $len == 0 ));then
+				echo "No available tables"
+			else
+				select Current_Table in ${available_Tables[@]} "Return"
+				do
+					#make sure to choose of the available Tables
+					case $REPLY in
+						[1-$len] )
+							if [[ `cat $Current_Table` == "" ]];then
+								clear
+								echo "Table is empty" 
+								break
+							else
+								clear
+								PS3="please choose delete mode: "
+								select mode in "Delete all" "Delete by record" "Return"
+								do
+									case $REPLY in	
+										1)
+											sed -ni '/^*/d' $Current_Table
+											clear
+											echo "Table content deleted"
+											break
+										;;								
+										2)
+											col=(`cut -d ' ' -f 1 .$Current_Table`)
+											col_len=${#col[@]}
+											clear
+											PS3="please choose column: "
+											select col in ${col[@]} "Return"
+											do	
+												case $REPLY in
+													[1-$col_len] )
+														clear
+														read -p "Please enter value of $col to delete its entry: " value
+														var=`awk -F' ' 'BEGIN{x=0}{
+															if($c==v){
+																line=$0
+																print line
+																x=1
+																}
+															}
+															END{if(x==0)print "No match"}' l=$col_len c=$REPLY v=$value $Current_Table`
+														sed -i "/$var/d" $Current_Table
+														if [[ $var == 'No match' ]];then
+															clear
+															echo "No match"
+														else
+															clear
+															echo "Entry deleted" 
+														fi
+														break
+													;;
+													$(($col_len+1)) )
+														clear; break
+													;;
+													*)
+														clear
+														echo "please choose between displayed columns"
+												esac
+												REPLY=	
+											done
+											break
+										;;
+										3)
+											clear; break
+										;;
+										*)
+											clear
+											echo "please choose 1-2" 
+									esac
+									REPLY=
+								done
+								break
+							fi
+						;;
+						$(($len+1)) )
+							clear; break
+						;;
+						*)
+							clear
+							echo "please choose between displayed tables" 
+					esac
+					REPLY=
+				done
+			fi
+			PS3="connected to $1 DB   
+please choose operation >>"
+		;;
+		#update table
+		7)
+			clear
+			# col_len=${#col_arr[@]}
+			PS3="please choose Table to delete from: "
+			available_Tables=( `ls $PWD` )
+			len=${#available_Tables[@]}
+			if (( $len == 0 ));then
+				echo "No available tables"
+			else
+				select Current_Table in ${available_Tables[@]} "Return"
+				do
+					#make sure to choose of the available Tables
+					case $REPLY in
+						[1-$len] )
+							if [[ `cat $Current_Table` == "" ]];then
+								clear
+								echo "Table is empty" 
+								break
+							else
+								clear
+								col=(`cut -d ' ' -f 1 .$Current_Table`)
+								col_len=${#col[@]}
+								clear
+								PS3="please choose column: "
+								select col in ${col[@]} "Return"
+								do	
+									case $REPLY in
+										[1-$col_len] )
+											clear
+											read -p "Please enter value of $col to update: " replace
+											read -p "Please enter new value of $col: " new
+											type=`awk -F' ' '{
+												if($1==c){
+													print $3
+													}										
+												}' c=$col .$Current_Table`
+											const=`awk -F' ' '{
+												if($1==c){
+													print $2
+													}										
+												}' c=$col .$Current_Table`
+											while true
+											do
+												#constrain check
+												if [[ $const != "NO" ]];then
+													var=`awk -F' ' '{
+														if($c==e){
+															print e
+															}										
+														}' e=$new c=$REPLY $Current_Table`	
+													if [[ $var == "" ]];then
+														if [[ $type == "int" ]];then	
+															if [[ $new =~ [[:digit:]]+ ]];then							
+																break
+															else
+																clear
+																echo "please enter a number"
+																read -p "Please enter new value of $col: " new
+															fi
+														else
+															if [[ $new =~ [[:alpha:]]+ ]];then							
+																break
+															else
+																clear
+																echo "please enter a string"
+																read -p "Please enter new value of $col: " new
+															fi
+														fi
+													else
+														clear
+														echo "this entry already exist"
+														read -p "please enter $col_val: " new
+													fi
+												else
+													if [[ $type == "int" ]];then	
+														if [[ $new =~ [[:digit:]]+ ]];then							
+															break
+														else
+															clear
+															echo "please enter a number"
+															read -p "Please enter new value of $col: " new
+														fi
+													else
+														if [[ $new =~ [[:alpha:]]+ ]];then							
+															break
+														else
+															clear
+															echo "please enter a string"
+															read -p "Please enter new value of $col: " new
+														fi
+													fi
+												fi
+											done
+											var1=`awk -F' ' '{
+												if($c==r){
+													print $0
+													}										
+												}' n=$new c=$REPLY r=$replace $Current_Table`
+											var2=`awk -F' ' '{
+												if($c==r){
+													$c=n
+													print $0
+													}										
+												}' n=$new c=$REPLY r=$replace $Current_Table`
+											if [[ $var1 != "" ]];then
+												clear
+												sed -i "s/$var1/$var2/g" $Current_Table	
+												echo "entry updated"
+											else
+												clear
+												echo "No match" 
+											fi
+											break
+										;;
+											$(($col_len+1)) )
+												clear; break
+										;;
+										*)
+											clear
+											echo "please choose between displayed columns"
+									esac
+									REPLY=	
+								done
+								break
+							fi 
+						;;
+						$(($len+1)) )
+							clear; break
+						;;
+						*)
+							clear
+							echo "please choose between displayed tables" 
+					esac
+					REPLY=
+				done
+			fi
+			PS3="connected to $1 DB   
+please choose operation >>"
+		;;
+		8)
+			clear; break
+		;;
+		#Exit
+		9) 
+			clear; exit
+		;;
+		#Default
+		*) 
+			clear
+			echo "Please enter a number between 1-8"
+	esac
+	REPLY=
+done

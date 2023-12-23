@@ -1,0 +1,182 @@
+#! /usr/bin/bash
+export LC_COLLATE=C
+shopt -s extglob 
+#clear screan
+clear
+#make sure you're in the right place
+if [ -d ./DB ];then
+	cd ./DB
+else
+	mkdir ./DB
+	cd ./DB
+fi
+#change opening menu prompt to current PWD
+PS3="PWD $PWD
+please choose operation >>"
+
+#make openig menu
+select DB_option in "Create DB" "Connect to DB" "List DB" "Drop DB" "Exit"
+do
+	PS3="PWD $PWD
+please choose operation >>"
+	case $REPLY in
+		#Create DB
+		1)
+			clear
+			#read DB name
+			read -p "Please enter DB name: " DB_name
+			#validate name
+			while true
+			do
+				case $DB_name in 
+					@([A-Za-z])*([A-Za-z0-9" ""_"]) ) 
+						#check if DB already exists			
+						if [ -e $DB_name ];then
+							clear
+							echo "This DB already exists"
+							read -p "Please enter DB name: " DB_name
+						else
+						#create DB directory
+							mkdir $DB_name
+							clear
+							echo "$DB_name DB created"
+							break
+						fi
+					;;
+					*)
+						clear
+						echo "DB name can only start with a char & can only contain chars, under_score or number"
+						read -p "Please enter DB name: " DB_name
+				esac
+			done	
+		;;
+		#Connect to DB		
+		2)
+			clear
+			#change prompt
+			PS3="please choose DB to connect to: " 
+			#check whether DBs exist 
+			available_DB=( `ls $PWD` )
+			len=${#available_DB[@]} 
+			if (( $len != 0 ));then
+				#view list of available DBs to choose between
+				clear
+				select Current_DB in ${available_DB[@]} "Return"
+				do
+					case $REPLY in
+						#make sure to choose of the available DBs
+						[1-$len] )
+							#cd to choosen DB and redirect to tabels file
+							cd ./$Current_DB
+							clear	
+							. ../../tables $Current_DB
+							break
+						;;
+						$(($len+1)) )
+							clear; break
+						;;
+						*)
+							clear
+							echo "please choose between displayed DBs"
+					esac
+					REPLY=	
+				done
+			else
+				clear
+				echo "no available DBs"	
+			fi
+			PS3="PWD $PWD
+please choose operation >>"	
+		;;
+		
+		#LISt DB
+		3)
+			clear
+			#check whether DBs exist
+			available_DB=( `ls $PWD` )
+			len=${#available_DB[@]}
+			if (( $len != 0 ));then
+				#list available DBs
+				echo "available DBs"
+				ls -F | grep / 
+				echo ""
+			else
+				echo "No available DBs"		
+			fi
+		;;
+		#Drop DB
+		4) 
+			clear
+			#check whether DBs exist
+			available_DB=( `ls $PWD` )
+			len=${#available_DB[@]}
+			if (( $len != 0 ));then
+				PS3="please choose drop mode : "
+				#select to drop all or just one
+				select op in "Drop all" "Drop one" "Return"
+				do
+					#make sure to choose of the available options
+					case $REPLY in 
+						1)
+							clear
+							for DB in ${available_DB[@]}
+							do
+								rm -r $DB
+							done
+							echo "all DBs removed"
+							break
+						;;
+						2)
+							clear
+							PS3="please choose DB to drop : "
+							select Current_DB in ${available_DB[@]} "Return"
+							do
+								#make sure to choose of the available DBs
+								case $REPLY in
+									[1-$len] )
+										rm -r ./$Current_DB
+										clear
+										echo "$Current_DB DB removed"
+										break
+									;;
+									$(($len+1)) )
+										clear; break
+									;;	
+									*)
+										clear
+										echo "please choose between displayed DBs" 
+								esac	
+								REPLY=			
+							done
+							break
+						;;
+						3)
+							clear; break
+						;;
+						*)
+							clear
+							echo "Please choose from available modes"
+					esac
+					REPLY=
+				done	
+			else
+				clear
+				echo "No available DBs"
+			fi
+			PS3="PWD $PWD
+please choose operation >>"
+		;;
+		#Exit
+		5) 
+			clear; exit
+		;;
+
+		#default
+		*)
+			clear 
+			echo "Please choose from available operations"
+	esac
+	REPLY=
+done
+
+
